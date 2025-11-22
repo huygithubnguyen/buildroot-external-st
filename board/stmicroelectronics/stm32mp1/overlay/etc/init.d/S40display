@@ -1,0 +1,159 @@
+#!/bin/sh
+
+# Display/GPU Initialization Script
+# Sets up display and GPU for Qt5 applications on STM32MP157F-DK2
+
+# Start after Qt5 environment setup
+# Start before touch screen services
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+
+# Initialize display subsystem
+init_display() {
+    echo "Initializing display subsystem..."
+    
+    # Load display modules
+    modprobe drm
+    modprobe drm_kms_helper
+    modprobe stm32_drm
+    
+    # Wait for display device to be available
+    for i in 1 2 3 4 5; do
+        if [ -e "/dev/dri/card0" ]; then
+            echo "Display device found"
+            break
+        fi
+        echo "Waiting for display device... ($i/5)"
+        sleep 1
+    done
+    
+    # Check if display device is available
+    if [ ! -e "/dev/dri/card0" ]; then
+        echo "Error: Display device not found"
+        return 1
+    fi
+    
+    # Set display device permissions
+    chmod 666 /dev/dri/card0
+    chgrp video /dev/dri/card0
+    
+    echo "Display subsystem initialized"
+}
+
+# Initialize GPU acceleration
+init_gpu() {
+    echo "Initializing GPU acceleration..."
+    
+    # Load GPU modules
+    modprobe gpu_sched
+    modprobe panfrost
+    
+    # Wait for GPU device
+    for i in 1 2 3 4 5; do
+        if [ -e "/dev/dri/renderD128" ]; then
+            echo "GPU device found"
+            break
+        fi
+        echo "Waiting for GPU device... ($i/5)"
+        sleep 1
+    done
+    
+    # Check if GPU device is available
+    if [ ! -e "/dev/dri/renderD128" ]; then
+        echo "Warning: GPU device not found, software rendering will be used"
+        return 0
+    fi
+    
+    # Set GPU device permissions
+    chmod 666 /dev/dri/renderD128
+    chgrp video /dev/dri/renderD128
+    
+    echo "GPU acceleration initialized"
+}
+
+# Validate display setup
+validate_display() {
+    echo "Validating display setup..."
+    
+    # Check display device
+    if [ ! -e "/dev/dri/card0" ]; then
+        echo "Error: Display device not available"
+        return 1
+    fi
+    
+    # Check GPU device (optional)
+    if [ ! -e "/dev/dri/renderD128" ]; then
+        echo "Warning: GPU device not available"
+    fi
+    
+    # Check framebuffer device
+    if [ ! -e "/dev/fb0" ]; then
+        echo "Error: Framebuffer device not available"
+        return 1
+    fi
+    
+    echo "Display setup validation complete"
+    return 0
+}
+
+# Main function
+start() {
+    echo "Starting display initialization..."
+    
+    # Initialize display subsystem
+    if ! init_display; then
+        echo "Display initialization failed"
+        return 1
+    fi
+    
+    # Initialize GPU acceleration
+    init_gpu
+    
+    # Validate display setup
+    if ! validate_display; then
+        echo "Display validation failed"
+        return 1
+    fi
+    
+    echo "Display initialization completed successfully"
+}
+
+# Stop function
+stop() {
+    echo "Stopping display subsystem..."
+    
+    # Unload modules (optional, may cause system instability)
+    # rmmod panfrost
+    # rmmod gpu_sched
+    # rmmod stm32_drm
+    # rmmod drm_kms_helper
+    # rmmod drm
+    
+    echo "Display subsystem stopped"
+}
+
+# Restart function
+restart() {
+    stop
+    sleep 2
+    start
+}
+
+# Handle command line arguments
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart|reload)
+        restart
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac
+
+exit 0

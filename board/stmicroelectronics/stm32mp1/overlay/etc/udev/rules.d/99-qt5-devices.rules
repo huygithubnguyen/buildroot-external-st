@@ -1,0 +1,17 @@
+# Qt5 Device Rules for STM32MP157F-DK2
+
+# Display/DRM device permissions
+KERNEL=="card0", SUBSYSTEM=="drm", MODE="0666", GROUP="video"
+
+# Touch screen device permissions
+KERNEL=="event[0-9]*", SUBSYSTEM=="input", ATTRS{name}=="*touch*", MODE="0666", GROUP="input"
+
+# Input device permissions for Qt5
+KERNEL=="event[0-9]*", SUBSYSTEM=="input", MODE="0666", GROUP="input"
+
+# Framebuffer device permissions
+KERNEL=="fb[0-9]*", MODE="0666", GROUP="video"
+
+# DRI device permissions
+KERNEL=="dri/*", MODE="0666", GROUP="video"
+

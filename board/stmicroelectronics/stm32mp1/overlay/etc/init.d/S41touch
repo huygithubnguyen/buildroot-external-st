@@ -1,0 +1,147 @@
+#!/bin/sh
+
+# Touch Screen Setup Script
+# Configures touch screen for Qt5 applications on STM32MP157F-DK2
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+
+# Detect touch screen device
+detect_touch_device() {
+    echo "Detecting touch screen device..."
+    
+    # Look for touch screen input devices
+    for device in /dev/input/event*; do
+        if [ -e "$device" ]; then
+            # Check if device is a touch screen
+            if udevadm info --query=property --name="$device" | grep -q "ID_INPUT_TOUCHSCREEN=1"; then
+                TOUCH_DEVICE="$device"
+                echo "Touch screen found: $TOUCH_DEVICE"
+                return 0
+            fi
+        fi
+    done
+    
+    # Fallback: try event0
+    if [ -e "/dev/input/event0" ]; then
+        TOUCH_DEVICE="/dev/input/event0"
+        echo "Using fallback touch device: $TOUCH_DEVICE"
+        return 0
+    fi
+    
+    echo "Error: No touch screen device found"
+    return 1
+}
+
+# Initialize touch screen
+init_touchscreen() {
+    echo "Initializing touch screen..."
+    
+    # Load input modules
+    modprobe evdev
+    modprobe input_core
+    
+    # Detect touch device
+    if ! detect_touch_device; then
+        echo "Touch screen detection failed"
+        return 1
+    fi
+    
+    # Set touch device permissions
+    chmod 666 "$TOUCH_DEVICE"
+    chgrp input "$TOUCH_DEVICE"
+    
+    # Create tslib calibration file if it does not exist
+    if [ ! -f "/etc/pointercal" ]; then
+        echo "Creating default tslib calibration file..."
+        cat > /etc/pointercal << EOF
+-59 20688 -536 4294936768 532 -20688 4294967296 65536
+EOF
+        chmod 644 /etc/pointercal
+    fi
+    
+    echo "Touch screen initialized"
+}
+
+# Configure Qt5 touch input
+configure_qt5_touch() {
+    echo "Configuring Qt5 touch input..."
+    
+    # Update Qt5 environment with detected touch device
+    export QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS="$TOUCH_DEVICE"
+    
+    echo "Qt5 touch input configured"
+}
+
+# Validate touch screen setup
+validate_touchscreen() {
+    echo "Validating touch screen setup..."
+    
+    # Check touch device
+    if [ ! -e "$TOUCH_DEVICE" ]; then
+        echo "Error: Touch device not available"
+        return 1
+    fi
+    
+    # Check tslib configuration
+    if [ ! -f "/etc/ts.conf" ]; then
+        echo "Error: tslib configuration not found"
+        return 1
+    fi
+    
+    echo "Touch screen validation complete"
+    return 0
+}
+
+# Main function
+start() {
+    echo "Starting touch screen setup..."
+    
+    # Initialize touch screen
+    if ! init_touchscreen; then
+        echo "Touch screen initialization failed"
+        return 1
+    fi
+    
+    # Configure Qt5 touch input
+    configure_qt5_touch
+    
+    # Validate touch screen setup
+    if ! validate_touchscreen; then
+        echo "Touch screen validation failed"
+        return 1
+    fi
+    
+    echo "Touch screen setup completed successfully"
+}
+
+# Stop function
+stop() {
+    echo "Stopping touch screen..."
+    echo "Touch screen stopped"
+}
+
+# Restart function
+restart() {
+    stop
+    sleep 1
+    start
+}
+
+# Handle command line arguments
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart|reload)
+        restart
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac
+
+exit 0
