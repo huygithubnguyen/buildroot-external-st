@@ -1,9 +1,13 @@
 #!/bin/sh
-
-# Qt5 Services Startup Script
-# Starts Qt5 application services on STM32MP157F-DK2
-
-# Start after Qt5 environment, display, and touch setup
+### BEGIN INIT INFO
+# Provides:          qt5-services
+# Required-Start:     $local_fs $syslog qt5-env display touch
+# Required-Stop:      $local_fs $syslog
+# Default-Start:      2 3 4 5
+# Default-Stop:       0 1 6
+# Short-Description:  Qt5 application services for STM32MP157F-DK2
+# Description:        Start Qt5 applications and service manager
+### END INIT INFO
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 
@@ -56,7 +60,7 @@ configure_qt5_services() {
         mkdir -p /etc/qt5
     fi
     
-    cat > /etc/qt5/services-config.json << EOF
+    cat > /etc/qt5/services-config.json << CONFEOF
 {
     "services": [
         {
@@ -73,7 +77,7 @@ configure_qt5_services() {
         }
     ]
 }
-EOF
+CONFEOF
     
     echo "Qt5 services environment configured"
 }
@@ -139,6 +143,39 @@ restart() {
     start
 }
 
+# Status function
+status() {
+    echo "=== STM32MP157F-DK2 Qt5 Services Status ==="
+    
+    echo "Running Qt5 applications:"
+    ps aux | grep -E "(qt5-demo|bikecomputer|qt5-app-manager)" | grep -v grep | sed 's/^/  /' || echo "  No Qt5 applications running"
+    
+    echo ""
+    echo "Configuration files:"
+    if [ -f "/etc/qt5/services-config.json" ]; then
+        echo "  ✅ /etc/qt5/services-config.json - EXISTS"
+    else
+        echo "  ❌ /etc/qt5/services-config.json - MISSING"
+    fi
+    
+    if [ -f "/etc/qt5/kms-config.json" ]; then
+        echo "  ✅ /etc/qt5/kms-config.json - EXISTS"
+    else
+        echo "  ❌ /etc/qt5/kms-config.json - MISSING"
+    fi
+    
+    echo ""
+    echo "Runtime directories:"
+    if [ -d "/var/run/qt5" ]; then
+        echo "  ✅ /var/run/qt5 - EXISTS"
+        ls -la /var/run/qt5/ 2>/dev/null | sed 's/^/    /'
+    else
+        echo "  ❌ /var/run/qt5 - MISSING"
+    fi
+    
+    echo "=== Status Complete ==="
+}
+
 # Handle command line arguments
 case "$1" in
     start)
@@ -150,8 +187,15 @@ case "$1" in
     restart|reload)
         restart
         ;;
+    status)
+        status
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart}"
+        echo "Usage: $0 {start|stop|restart|status}"
+        echo "  start   - Start Qt5 services"
+        echo "  stop    - Stop Qt5 services"
+        echo "  restart - Restart Qt5 services"
+        echo "  status  - Show Qt5 services status"
         exit 1
         ;;
 esac

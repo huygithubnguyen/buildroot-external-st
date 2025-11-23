@@ -1,7 +1,13 @@
 #!/bin/sh
-
-# Touch Screen Setup Script
-# Configures touch screen for Qt5 applications on STM32MP157F-DK2
+### BEGIN INIT INFO
+# Provides:          touch
+# Required-Start:     $local_fs $syslog display
+# Required-Stop:      $local_fs $syslog
+# Default-Start:      2 3 4 5
+# Default-Stop:       0 1 6
+# Short-Description:  Touch screen setup for STM32MP157F-DK2
+# Description:        Configure touch screen and tslib for Qt5 applications
+### END INIT INFO
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 
@@ -37,8 +43,8 @@ init_touchscreen() {
     echo "Initializing touch screen..."
     
     # Load input modules
-    modprobe evdev
-    modprobe input_core
+    modprobe evdev 2>/dev/null
+    modprobe input_core 2>/dev/null
     
     # Detect touch device
     if ! detect_touch_device; then
@@ -53,9 +59,9 @@ init_touchscreen() {
     # Create tslib calibration file if it does not exist
     if [ ! -f "/etc/pointercal" ]; then
         echo "Creating default tslib calibration file..."
-        cat > /etc/pointercal << EOF
+        cat > /etc/pointercal << CALIBEOF
 -59 20688 -536 4294936768 532 -20688 4294967296 65536
-EOF
+CALIBEOF
         chmod 644 /etc/pointercal
     fi
     
@@ -84,8 +90,13 @@ validate_touchscreen() {
     
     # Check tslib configuration
     if [ ! -f "/etc/ts.conf" ]; then
-        echo "Error: tslib configuration not found"
-        return 1
+        echo "Warning: tslib configuration not found - creating default"
+        cat > /etc/ts.conf << CONFEOF
+# tslib configuration for STM32MP157F-DK2
+module_raw input
+module linear
+CONFEOF
+        chmod 644 /etc/ts.conf
     fi
     
     echo "Touch screen validation complete"
@@ -127,6 +138,36 @@ restart() {
     start
 }
 
+# Status function
+status() {
+    echo "=== STM32MP157F-DK2 Touch Screen Status ==="
+    
+    if [ -n "$TOUCH_DEVICE" ] && [ -e "$TOUCH_DEVICE" ]; then
+        echo "✅ Touch device: $TOUCH_DEVICE - AVAILABLE"
+        ls -la "$TOUCH_DEVICE" | sed 's/^/  /'
+    else
+        echo "❌ Touch device: NOT DETECTED"
+        echo "Available input devices:"
+        ls -la /dev/input/event* 2>/dev/null | sed 's/^/  /' || echo "  No input devices found"
+    fi
+    
+    echo ""
+    echo "Configuration files:"
+    if [ -f "/etc/pointercal" ]; then
+        echo "  ✅ /etc/pointercal - EXISTS"
+    else
+        echo "  ❌ /etc/pointercal - MISSING"
+    fi
+    
+    if [ -f "/etc/ts.conf" ]; then
+        echo "  ✅ /etc/ts.conf - EXISTS"
+    else
+        echo "  ❌ /etc/ts.conf - MISSING"
+    fi
+    
+    echo "=== Status Complete ==="
+}
+
 # Handle command line arguments
 case "$1" in
     start)
@@ -138,8 +179,15 @@ case "$1" in
     restart|reload)
         restart
         ;;
+    status)
+        status
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart}"
+        echo "Usage: $0 {start|stop|restart|status}"
+        echo "  start   - Initialize touch screen"
+        echo "  stop    - Stop touch screen"
+        echo "  restart - Restart touch screen"
+        echo "  status  - Show touch screen status"
         exit 1
         ;;
 esac

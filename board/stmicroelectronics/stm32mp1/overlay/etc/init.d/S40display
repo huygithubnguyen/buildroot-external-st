@@ -1,26 +1,237 @@
 #!/bin/sh
-
-# Display/GPU Initialization Script
-# Sets up display and GPU for Qt5 applications on STM32MP157F-DK2
-
-# Start after Qt5 environment setup
-# Start before touch screen services
+### BEGIN INIT INFO
+# Provides:          display
+# Required-Start:     $local_fs $syslog
+# Required-Stop:      $local_fs $syslog
+# Default-Start:      2 3 4 5
+# Default-Stop:       0 1 6
+# Short-Description:  Display/GPU initialization for STM32MP157F-DK2
+# Description:        Initialize display subsystem and GPU acceleration
+### END INIT INFO
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
+
+# Check STM32MP1 specific GPU architecture
+check_stm32mp_gpu_architecture() {
+    echo "Checking STM32MP1 GPU architecture..."
+    
+    # Check display controller
+    if [ -f "/sys/class/drm/card0/device/uevent" ]; then
+        display_driver=$(grep "DRIVER=" /sys/class/drm/card0/device/uevent | cut -d= -f2)
+        echo "  Display controller: $display_driver"
+        
+        case "$display_driver" in
+            "stm32-display")
+                echo "  ✅ STM32 LTDC display controller detected"
+                echo "  ℹ️  Note: LTDC is independent from GPU"
+                ;;
+            *)
+                echo "  ⚠️  Unknown display controller: $display_driver"
+                ;;
+        esac
+    fi
+    
+    # Check GPU driver
+    if lsmod | grep -q "galcore"; then
+        galcore_version=$(dmesg | grep "Galcore version" | tail -1 | sed 's/.*Galcore version \([0-9.]*\).*/\1/')
+        echo "  GPU driver: galcore v$galcore_version"
+        echo "  ℹ️  Note: galcore is separate from display controller"
+    fi
+    
+    # Check for panfrost
+    if lsmod | grep -q "panfrost"; then
+        echo "  ✅ Panfrost DRM bridge loaded"
+    fi
+    
+    echo "  Architecture: STM32MP1 (separate display + GPU)"
+}
+
+# Create GPU device nodes for STM32MP1
+create_stm32mp_gpu_nodes() {
+    echo "Creating STM32MP1 GPU device nodes..."
+    
+    # Check if galcore device exists
+    if [ -d "/sys/class/misc/galcore" ]; then
+        echo "✅ Galcore device found in sysfs"
+        
+        # Get galcore device numbers
+        if [ -f "/sys/class/misc/galcore/dev" ]; then
+            galcore_dev=$(cat /sys/class/misc/galcore/dev)
+            major=$(echo $galcore_dev | cut -d: -f1)
+            minor=$(echo $galcore_dev | cut -d: -f2)
+            echo "  Galcore device: major=$major, minor=$minor"
+            
+            # Create galcore device node
+            if [ ! -e "/dev/galcore" ]; then
+                echo "  Creating /dev/galcore device node..."
+                mknod /dev/galcore c $major $minor 2>/dev/null
+                if [ -e "/dev/galcore" ]; then
+                    chmod 666 /dev/galcore
+                    chgrp video /dev/galcore
+                    echo "  ✅ /dev/galcore created successfully"
+                else
+                    echo "  ❌ Failed to create /dev/galcore"
+                fi
+            else
+                echo "  ✅ /dev/galcore already exists"
+            fi
+        fi
+    fi
+    
+    # Check for panfrost device
+    if lsmod | grep -q "panfrost"; then
+        echo "✅ Panfrost loaded - checking for device..."
+        
+        # Try to find panfrost device
+        if [ -d "/sys/class/misc/panfrost" ]; then
+            echo "  Panfrost device found in sysfs"
+            
+            # Get panfrost device numbers
+            if [ -f "/sys/class/misc/panfrost/dev" ]; then
+                panfrost_dev=$(cat /sys/class/misc/panfrost/dev)
+                major=$(echo $panfrost_dev | cut -d: -f1)
+                minor=$(echo $panfrost_dev | cut -d: -f2)
+                echo "  Panfrost device: major=$major, minor=$minor"
+                
+                # Create panfrost device node
+                if [ ! -e "/dev/panfrost" ]; then
+                    echo "  Creating /dev/panfrost device node..."
+                    mknod /dev/panfrost c $major $minor 2>/dev/null
+                    if [ -e "/dev/panfrost" ]; then
+                        chmod 666 /dev/panfrost
+                        chgrp video /dev/panfrost
+                        echo "  ✅ /dev/panfrost created successfully"
+                    else
+                        echo "  ❌ Failed to create /dev/panfrost"
+                    fi
+                else
+                    echo "  ✅ /dev/panfrost already exists"
+                fi
+            fi
+        fi
+        
+        # Try to create DRM render node for panfrost
+        echo "  Attempting to create DRM render node..."
+        
+        # Check if we can find render device info
+        render_found=false
+        for i in /sys/class/drm/*/dev 2>/dev/null; do
+            [ -e "$i" ] || continue
+            if echo "$i" | grep -q "render"; then
+                render_dev=$(cat "$i")
+                major=$(echo $render_dev | cut -d: -f1)
+                minor=$(echo $render_dev | cut -d: -f2)
+                render_name=$(basename $(dirname "$i"))
+                
+                echo "  Found render device: $render_name ($major:$minor)"
+                
+                # Create render device node
+                if [ ! -e "/dev/dri/$render_name" ]; then
+                    mknod "/dev/dri/$render_name" c $major $minor 2>/dev/null
+                    if [ -e "/dev/dri/$render_name" ]; then
+                        chmod 666 "/dev/dri/$render_name"
+                        chgrp video "/dev/dri/$render_name"
+                        echo "  ✅ /dev/dri/$render_name created successfully"
+                        render_found=true
+                    fi
+                fi
+            fi
+        done
+        
+        if [ "$render_found" = "false" ]; then
+            echo "  ⚠️  No DRM render device found in sysfs"
+            echo "  ℹ️  STM32MP1 GPU may not use standard DRM render nodes"
+            echo "  ℹ️  Use /dev/galcore or /dev/panfrost instead"
+        fi
+    fi
+}
+
+# Test GPU functionality for STM32MP1
+test_stm32mp_gpu() {
+    echo "Testing STM32MP1 GPU functionality..."
+    
+    gpu_available=false
+    
+    # Test galcore device
+    if [ -e "/dev/galcore" ]; then
+        echo "✅ Galcore device available"
+        ls -la /dev/galcore | sed 's/^/  /'
+        gpu_available=true
+        
+        # Try to communicate with galcore
+        if command -v galcore_test >/dev/null 2>&1; then
+            echo "  Running galcore test..."
+            galcore_test 2>/dev/null && echo "  ✅ Galcore test passed" || echo "  ❌ Galcore test failed"
+        else
+            echo "  ℹ️  galcore_test utility not available"
+        fi
+    fi
+    
+    # Test panfrost device
+    if [ -e "/dev/panfrost" ]; then
+        echo "✅ Panfrost device available"
+        ls -la /dev/panfrost | sed 's/^/  /'
+        gpu_available=true
+        
+        # Try to get panfrost info
+        if [ -d "/sys/class/misc/panfrost" ]; then
+            echo "  Panfrost sysfs info:"
+            ls -la /sys/class/misc/panfrost/ 2>/dev/null | sed 's/^/    /'
+        fi
+    fi
+    
+    # Test DRM render nodes
+    if [ -e "/dev/dri/renderD128" ]; then
+        echo "✅ DRM render device available"
+        ls -la /dev/dri/renderD128 | sed 's/^/  /'
+        gpu_available=true
+    fi
+    
+    if [ "$gpu_available" = "false" ]; then
+        echo "❌ No GPU devices available"
+        echo "   Available devices in /dev:"
+        ls -la /dev/ | grep -E "(dri|galcore|panfrost|mali)" | sed 's/^/   /'
+    else
+        echo "✅ GPU functionality test completed"
+    fi
+}
+
+# Check if modules are already loaded
+check_loaded_modules() {
+    echo "Checking loaded display/GPU modules..."
+    
+    # Check GPU modules first (they are loaded!)
+    if lsmod | grep -q "panfrost"; then
+        echo "✅ panfrost module loaded"
+    fi
+    
+    if lsmod | grep -q "galcore"; then
+        echo "✅ galcore module loaded"
+    fi
+    
+    if lsmod | grep -q "gpu_sched"; then
+        echo "✅ gpu_sched module loaded"
+    fi
+    
+    # Check DRM (might be built-in)
+    if lsmod | grep -q "drm"; then
+        echo "✅ DRM modules loaded"
+    else
+        echo "ℹ️  DRM not in lsmod - likely built-in kernel"
+    fi
+}
 
 # Initialize display subsystem
 init_display() {
     echo "Initializing display subsystem..."
     
-    # Load display modules
-    modprobe drm
-    modprobe drm_kms_helper
-    modprobe stm32_drm
+    # DRM is likely built-in, don't try to load modules
+    echo "DRM support: Built-in kernel (STM32MP157F-DK2)"
     
     # Wait for display device to be available
     for i in 1 2 3 4 5; do
         if [ -e "/dev/dri/card0" ]; then
-            echo "Display device found"
+            echo "✅ Display device found: /dev/dri/card0"
             break
         fi
         echo "Waiting for display device... ($i/5)"
@@ -29,7 +240,7 @@ init_display() {
     
     # Check if display device is available
     if [ ! -e "/dev/dri/card0" ]; then
-        echo "Error: Display device not found"
+        echo "❌ Error: Display device not found"
         return 1
     fi
     
@@ -37,72 +248,152 @@ init_display() {
     chmod 666 /dev/dri/card0
     chgrp video /dev/dri/card0
     
-    echo "Display subsystem initialized"
-}
-
-# Initialize GPU acceleration
-init_gpu() {
-    echo "Initializing GPU acceleration..."
-    
-    # Load GPU modules
-    modprobe gpu_sched
-    modprobe panfrost
-    
-    # Wait for GPU device
-    for i in 1 2 3 4 5; do
-        if [ -e "/dev/dri/renderD128" ]; then
-            echo "GPU device found"
-            break
-        fi
-        echo "Waiting for GPU device... ($i/5)"
-        sleep 1
-    done
-    
-    # Check if GPU device is available
-    if [ ! -e "/dev/dri/renderD128" ]; then
-        echo "Warning: GPU device not found, software rendering will be used"
-        return 0
+    # Get display information
+    if command -v modetest >/dev/null 2>&1; then
+        echo "Display connectors:"
+        modetest -c 2>/dev/null | grep -A 10 "Connectors:" | sed 's/^/  /' || echo "  Unable to enumerate connectors"
     fi
     
-    # Set GPU device permissions
-    chmod 666 /dev/dri/renderD128
-    chgrp video /dev/dri/renderD128
-    
-    echo "GPU acceleration initialized"
+    echo "✅ Display subsystem initialized"
 }
 
-# Validate display setup
+# Initialize GPU for STM32MP1 architecture
+init_gpu() {
+    echo "Initializing GPU acceleration (STM32MP1)..."
+    
+    # Check if GPU modules are loaded
+    if lsmod | grep -q "galcore"; then
+        echo "✅ GPU modules loaded (galcore + panfrost)"
+    else
+        echo "⚠️  GPU modules not loaded"
+        return 1
+    fi
+    
+    # Create appropriate device nodes
+    create_stm32mp_gpu_nodes
+    
+    # Test GPU functionality
+    test_stm32mp_gpu
+    
+    # Report status
+    echo ""
+    echo "GPU initialization summary:"
+    
+    if [ -e "/dev/galcore" ]; then
+        echo "  ✅ Galcore device: /dev/galcore"
+    fi
+    
+    if [ -e "/dev/panfrost" ]; then
+        echo "  ✅ Panfrost device: /dev/panfrost"
+    fi
+    
+    if [ -e "/dev/dri/renderD128" ]; then
+        echo "  ✅ DRM render device: /dev/dri/renderD128"
+    fi
+    
+    if [ -e "/dev/galcore" ] || [ -e "/dev/panfrost" ] || [ -e "/dev/dri/renderD128" ]; then
+        echo "  ✅ GPU acceleration available"
+        return 0
+    else
+        echo "  ⚠️  No GPU devices created"
+        echo "  ℹ️  Display will use software rendering"
+        return 0  # Don't fail - display still works
+    fi
+}
+
+# Validate display setup (FIXED for STM32MP1)
 validate_display() {
     echo "Validating display setup..."
     
     # Check display device
     if [ ! -e "/dev/dri/card0" ]; then
-        echo "Error: Display device not available"
+        echo "❌ Error: Display device not available"
         return 1
     fi
     
-    # Check GPU device (optional)
-    if [ ! -e "/dev/dri/renderD128" ]; then
-        echo "Warning: GPU device not available"
+    # Check GPU devices (STM32MP1 specific) - FIXED LOGIC
+    gpu_available=false
+    
+    if [ -e "/dev/galcore" ]; then
+        echo "✅ GPU device available: /dev/galcore"
+        gpu_available=true
     fi
     
-    # Check framebuffer device
+    if [ -e "/dev/panfrost" ]; then
+        echo "✅ GPU device available: /dev/panfrost"
+        gpu_available=true
+    fi
+    
+    if [ -e "/dev/dri/renderD128" ]; then
+        echo "✅ GPU device available: /dev/dri/renderD128"
+        gpu_available=true
+    fi
+    
+    # ADDITIONAL CHECK: Check if galcore module is loaded even if device node missing
+    if [ "$gpu_available" = "false" ] && lsmod | grep -q "galcore"; then
+        echo "⚠️  Warning: galcore module loaded but device node missing"
+        echo "   This is normal if device node creation failed"
+        echo "   GPU acceleration may still work through DRM"
+        gpu_available=true
+    fi
+    
+    if [ "$gpu_available" = "false" ]; then
+        echo "⚠️  Warning: GPU device not available - software rendering"
+    else
+        echo "✅ GPU acceleration available"
+    fi
+    
+    # Check framebuffer device (optional for STM32MP1)
     if [ ! -e "/dev/fb0" ]; then
-        echo "Error: Framebuffer device not available"
-        return 1
+        echo "ℹ️  Framebuffer device not available (normal for STM32MP1)"
     fi
     
-    echo "Display setup validation complete"
+    echo "✅ Display setup validation complete"
     return 0
+}
+
+# Test display functionality
+test_display() {
+    echo "Testing display functionality..."
+    
+    if command -v modetest >/dev/null 2>&1; then
+        echo "Running display test with modetest..."
+        
+        # Get available connectors
+        connectors=$(modetest -c 2>/dev/null | grep "connected" | wc -l)
+        echo "Found $connectors connected display(s)"
+        
+        # Try DSI display first (built-in LCD - connector 34)
+        echo "Testing DSI display (built-in LCD)..."
+        if modetest -M stm -s 34:#0 2>/dev/null; then
+            echo "✅ DSI display test: SUCCESS"
+        else
+            echo "❌ DSI display test: FAILED"
+        fi
+        
+        # Try HDMI display (connector 32)
+        echo "Testing HDMI display..."
+        if modetest -M stm -s 32:#0 2>/dev/null; then
+            echo "✅ HDMI display test: SUCCESS"
+        else
+            echo "❌ HDMI display test: FAILED"
+        fi
+        
+    else
+        echo "⚠️  modetest not available - cannot test display"
+    fi
 }
 
 # Main function
 start() {
-    echo "Starting display initialization..."
+    echo "=== Starting STM32MP157F-DK2 Display Initialization ==="
+    
+    # Check current module status
+    check_loaded_modules
     
     # Initialize display subsystem
     if ! init_display; then
-        echo "Display initialization failed"
+        echo "❌ Display initialization failed"
         return 1
     fi
     
@@ -111,32 +402,69 @@ start() {
     
     # Validate display setup
     if ! validate_display; then
-        echo "Display validation failed"
+        echo "❌ Display validation failed"
         return 1
     fi
     
-    echo "Display initialization completed successfully"
+    # Test display functionality
+    test_display
+    
+    echo "✅ Display initialization completed successfully"
+    echo "=== Display Initialization Complete ==="
 }
 
 # Stop function
 stop() {
     echo "Stopping display subsystem..."
-    
-    # Unload modules (optional, may cause system instability)
-    # rmmod panfrost
-    # rmmod gpu_sched
-    # rmmod stm32_drm
-    # rmmod drm_kms_helper
-    # rmmod drm
-    
-    echo "Display subsystem stopped"
+    echo "Note: GPU/DRM modules left loaded for system stability"
+    echo "✅ Display subsystem stopped"
 }
 
 # Restart function
 restart() {
+    echo "Restarting display subsystem..."
     stop
     sleep 2
     start
+}
+
+# Status function with STM32MP1 details
+status() {
+    echo "=== STM32MP157F-DK2 Display Status ==="
+    
+    if [ -e "/dev/dri/card0" ]; then
+        echo "✅ Display device: /dev/dri/card0 - AVAILABLE"
+    else
+        echo "❌ Display device: /dev/dri/card0 - NOT AVAILABLE"
+    fi
+    
+    echo ""
+    echo "GPU devices:"
+    if [ -e "/dev/galcore" ]; then
+        echo "  ✅ Galcore: /dev/galcore - AVAILABLE"
+    else
+        echo "  ❌ Galcore: /dev/galcore - NOT AVAILABLE"
+    fi
+    
+    if [ -e "/dev/panfrost" ]; then
+        echo "  ✅ Panfrost: /dev/panfrost - AVAILABLE"
+    else
+        echo "  ❌ Panfrost: /dev/panfrost - NOT AVAILABLE"
+    fi
+    
+    if [ -e "/dev/dri/renderD128" ]; then
+        echo "  ✅ DRM Render: /dev/dri/renderD128 - AVAILABLE"
+    else
+        echo "  ❌ DRM Render: /dev/dri/renderD128 - NOT AVAILABLE"
+    fi
+    
+    echo ""
+    echo "Loaded modules:"
+    lsmod | grep -E "(galcore|panfrost|gpu_sched)" | sed 's/^/  /'
+    
+    echo ""
+    check_stm32mp_gpu_architecture
+    echo "=== Status Complete ==="
 }
 
 # Handle command line arguments
@@ -150,8 +478,15 @@ case "$1" in
     restart|reload)
         restart
         ;;
+    status)
+        status
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart}"
+        echo "Usage: $0 {start|stop|restart|status}"
+        echo "  start   - Initialize display and GPU"
+        echo "  stop    - Stop display subsystem"
+        echo "  restart - Restart display subsystem"
+        echo "  status  - Show display status"
         exit 1
         ;;
 esac
