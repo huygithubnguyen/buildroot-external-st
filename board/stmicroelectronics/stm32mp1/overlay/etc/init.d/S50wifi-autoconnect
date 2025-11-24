@@ -1,0 +1,169 @@
+#!/bin/sh
+# WiFi Auto-Connect Script for STM32MP157F-DK2 Bike Computer
+# Automatically connects to S23Portable network on boot
+
+set -euo pipefail
+
+# Configuration
+WPA_CONF="/etc/wpa_supplicant.conf"
+WPA_PID="/var/run/wpa_supplicant.pid"
+WPA_CTRL="/var/run/wpa_supplicant"
+WIFI_INTERFACE="wlan0"
+MAX_RETRIES=30
+RETRY_DELAY=2
+
+# Logging function
+log_msg() {
+    echo "[WiFi-Auto] $1" | logger -t wifi-autoconnect
+    echo "[WiFi-Auto] $1"
+}
+
+# Wait for WiFi interface to be available
+wait_for_interface() {
+    local count=0
+    log_msg "Waiting for WiFi interface $WIFI_INTERFACE..."
+    
+    while [ $count -lt $MAX_RETRIES ]; do
+        if ip link show "$WIFI_INTERFACE" >/dev/null 2>&1; then
+            log_msg "WiFi interface $WIFI_INTERFACE found"
+            return 0
+        fi
+        sleep $RETRY_DELAY
+        count=$((count + 1))
+    done
+    
+    log_msg "ERROR: WiFi interface $WIFI_INTERFACE not found after ${MAX_RETRIES}s"
+    return 1
+}
+
+# Start WPA supplicant
+start_wpa_supplicant() {
+    log_msg "Starting WPA supplicant for $WIFI_INTERFACE..."
+    
+    # Kill any existing wpa_supplicant
+    killall wpa_supplicant 2>/dev/null || true
+    sleep 1
+    
+    # Start wpa_supplicant in background
+    wpa_supplicant -B -i "$WIFI_INTERFACE" -c "$WPA_CONF" -P "$WPA_PID"
+    
+    # Wait for wpa_supplicant to start
+    local count=0
+    while [ $count -lt 10 ]; do
+        if [ -S "$WPA_CTRL" ]; then
+            log_msg "WPA supplicant started successfully"
+            return 0
+        fi
+        sleep 1
+        count=$((count + 1))
+    done
+    
+    log_msg "ERROR: Failed to start WPA supplicant"
+    return 1
+}
+
+# Wait for connection
+wait_for_connection() {
+    local count=0
+    log_msg "Waiting for WiFi connection..."
+    
+    while [ $count -lt $MAX_RETRIES ]; do
+        if wpa_cli -i "$WIFI_INTERFACE" status | grep -q "wpa_state=COMPLETED"; then
+            local ssid=$(wpa_cli -i "$WIFI_INTERFACE" status | grep "^ssid=" | cut -d'=' -f2)
+            local ip=$(ip -4 addr show "$WIFI_INTERFACE" | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+            log_msg "Connected to $ssid with IP $ip"
+            return 0
+        fi
+        
+        # Show connection status every 5 retries
+        if [ $((count % 5)) -eq 0 ]; then
+            local status=$(wpa_cli -i "$WIFI_INTERFACE" status | grep "wpa_state=" | cut -d'=' -f2)
+            log_msg "Connection status: $status ($count/$MAX_RETRIES)"
+        fi
+        
+        sleep $RETRY_DELAY
+        count=$((count + 1))
+    done
+    
+    log_msg "ERROR: Failed to connect to WiFi after ${MAX_RETRIES}s"
+    return 1
+}
+
+# Configure IP address (DHCP)
+configure_ip() {
+    log_msg "Requesting IP address via DHCP..."
+    
+    # Kill any existing dhclient
+    killall udhcpc 2>/dev/null || true
+    killall dhclient 2>/dev/null || true
+    sleep 1
+    
+    # Request IP via DHCP
+    if udhcpc -i "$WIFI_INTERFACE" -b -R; then
+        log_msg "DHCP client started successfully"
+        return 0
+    else
+        log_msg "ERROR: Failed to start DHCP client"
+        return 1
+    fi
+}
+
+# Main function
+main() {
+    log_msg "Starting WiFi auto-connect service..."
+    
+    # Check if configuration exists
+    if [ ! -f "$WPA_CONF" ]; then
+        log_msg "ERROR: WPA configuration file $WPA_CONF not found"
+        exit 1
+    fi
+    
+    # Wait for interface
+    wait_for_interface || exit 1
+    
+    # Bring interface up
+    ip link set "$WIFI_INTERFACE" up
+    log_msg "WiFi interface $WIFI_INTERFACE brought up"
+    
+    # Start WPA supplicant
+    start_wpa_supplicant || exit 1
+    
+    # Wait for connection
+    wait_for_connection || exit 1
+    
+    # Configure IP
+    configure_ip || exit 1
+    
+    log_msg "WiFi auto-connect completed successfully"
+    
+    # Create status file for other services
+    echo "$(date): Connected to S23Portable" > /tmp/wifi-status
+}
+
+# Handle stop signal
+stop_wifi() {
+    log_msg "Stopping WiFi auto-connect service..."
+    killall wpa_supplicant 2>/dev/null || true
+    killall udhcpc 2>/dev/null || true
+    ip link set "$WIFI_INTERFACE" down 2>/dev/null || true
+    rm -f /tmp/wifi-status
+    log_msg "WiFi service stopped"
+}
+
+case "$1" in
+    start)
+        main
+        ;;
+    stop)
+        stop_wifi
+        ;;
+    restart)
+        stop_wifi
+        sleep 2
+        main
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac

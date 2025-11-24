@@ -1,0 +1,18 @@
+# Network Configuration for STM32MP157F-DK2 Bike Computer
+# Auto-connect to S23Portable WiFi network
+
+# Interface configuration
+auto wlan0
+iface wlan0 inet dhcp
+    wireless-mode managed
+    wireless-essid S23Portable
+    # WPA supplicant will handle authentication
+    wpa-driver wext
+    wpa-conf /etc/wpa_supplicant.conf
+
+# DNS configuration (optional - fallback)
+# nameserver 8.8.8.8
+# nameserver 8.8.4.4
+
+# Network routes (optional - for specific routing)
+# up route add default gw 192.168.1.1 wlan0
