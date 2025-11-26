@@ -1,0 +1,39 @@
+#!/bin/sh
+# Qt5 Log Rotation Script for STM32MP157F-DK2
+
+set -euo pipefail
+
+LOG_DIR="/var/log/qt5"
+MAX_SIZE="1M"
+MAX_FILES=5
+
+echo "Rotating Qt5 logs..."
+
+# Rotate log files
+for log_file in "$LOG_DIR"/*.log; do
+    if [ -f "$log_file" ]; then
+        # Check file size
+        if [ $(stat -c%s "$log_file" 2>/dev/null || echo 0) -gt 1048576 ]; then
+            echo "Rotating $(basename "$log_file")..."
+            
+            # Rotate existing logs
+            for i in $((MAX_FILES-1)); do
+                if [ -f "${log_file}.${i}" ]; then
+                    mv "${log_file}.${i}" "${log_file}.$((i+1))"
+                fi
+            done
+            
+            # Move current log
+            mv "$log_file" "${log_file}.1"
+            
+            # Create new log file
+            touch "$log_file"
+            chmod 0644 "$log_file"
+        fi
+    fi
+done
+
+# Clean up old logs
+find "$LOG_DIR" -name "*.log.$MAX_FILES" -delete 2>/dev/null || true
+
+echo "Qt5 log rotation completed"

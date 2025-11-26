@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Qt5 Demo
+Name[en]=Qt5 Demo Application
+Comment=Simple Qt5 demo for STM32MP157F-DK2
+Comment[en]=Demonstration of Qt5 GUI capabilities
+Exec=/opt/qt_demo/qt_demo
+Icon=qt5-demo
+Terminal=false
+Categories=Development;Utility;
+StartupNotify=true

@@ -16,6 +16,12 @@ start_qt5_services() {
     echo "Starting Qt5 services..."
     
     # Create Qt5 runtime directories
+
+    # Setup IPC mechanisms
+    if [ -x "/usr/bin/qt5-ipc-setup" ]; then
+        echo "Setting up Qt5 IPC..."
+        /usr/bin/qt5-ipc-setup
+    fi
     mkdir -p /var/run/qt5
     mkdir -p /var/log/qt5
     mkdir -p /var/cache/qt5

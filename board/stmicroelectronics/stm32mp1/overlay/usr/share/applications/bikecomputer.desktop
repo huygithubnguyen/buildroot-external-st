@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Bike Computer
+Name[en]=STM32 Bike Computer
+Comment=Bike computer application for STM32MP157F-DK2
+Comment[en]=GPS-enabled bike computer with Qt5 interface
+Exec=/opt/bike_computer/bike-computer
+Icon=bike-computer
+Terminal=false
+Categories=Utility;Sports;
+StartupNotify=true

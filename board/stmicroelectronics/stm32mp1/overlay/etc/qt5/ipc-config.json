@@ -1,0 +1,33 @@
+{
+    "ipc": {
+        "type": "qt-local-socket",
+        "socket_path": "/var/run/qt5/ipc.sock",
+        "permissions": "0660",
+        "group": "qt5"
+    },
+    "services": [
+        {
+            "name": "qt5-demo",
+            "ipc_enabled": true,
+            "message_types": ["status", "command", "event"],
+            "socket_path": "/var/run/qt5/qt5-demo.sock"
+        },
+        {
+            "name": "bikecomputer", 
+            "ipc_enabled": true,
+            "message_types": ["gps_data", "sensor_data", "status"],
+            "socket_path": "/var/run/qt5/bikecomputer.sock"
+        }
+    ],
+    "shared_memory": {
+        "enabled": true,
+        "path": "/var/run/qt5/shared_mem",
+        "size": "1M",
+        "permissions": "0660"
+    },
+    "dbus": {
+        "enabled": false,
+        "service_name": "org.stm32mp1.qt5",
+        "object_path": "/org/stm32mp1/qt5"
+    }
+}

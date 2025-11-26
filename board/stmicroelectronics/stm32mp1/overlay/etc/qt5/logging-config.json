@@ -1,0 +1,28 @@
+{
+    "logging": {
+        "level": "info",
+        "format": "json",
+        "max_file_size": "1M",
+        "max_files": 5,
+        "log_directory": "/var/log/qt5"
+    },
+    "services": [
+        {
+            "name": "qt5-demo",
+            "log_file": "/var/log/qt5/qt5-demo.log",
+            "level": "debug",
+            "rotation": true
+        },
+        {
+            "name": "bikecomputer",
+            "log_file": "/var/log/qt5/bikecomputer.log", 
+            "level": "info",
+            "rotation": true
+        }
+    ],
+    "ipc_logging": {
+        "enabled": true,
+        "log_file": "/var/log/qt5/ipc.log",
+        "level": "debug"
+    }
+}

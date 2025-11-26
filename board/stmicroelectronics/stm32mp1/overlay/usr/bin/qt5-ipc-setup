@@ -1,0 +1,47 @@
+#!/bin/sh
+# Qt5 IPC Setup Script for STM32MP157F-DK2
+
+set -euo pipefail
+
+echo "Setting up Qt5 IPC mechanisms..."
+
+# Create IPC group
+if ! getent group qt5 >/dev/null 2>&1; then
+    echo "Creating qt5 group..."
+    addgroup qt5
+fi
+
+# Create IPC runtime directory
+mkdir -p /var/run/qt5/ipc
+mkdir -p /var/run/qt5/shared_mem
+
+# Set permissions
+chown -R root:qt5 /var/run/qt5
+chmod -R 0660 /var/run/qt5
+
+# Create shared memory file
+if [ ! -f "/var/run/qt5/shared_mem/qt5_shared" ]; then
+    echo "Creating shared memory file..."
+    dd if=/dev/zero of=/var/run/qt5/shared_mem/qt5_shared bs=1M count=1 2>/dev/null
+    chmod 0660 /var/run/qt5/shared_mem/qt5_shared
+    chown root:qt5 /var/run/qt5/shared_mem/qt5_shared
+fi
+
+# Setup IPC sockets directory
+mkdir -p /var/run/qt5/sockets
+chmod 0770 /var/run/qt5/sockets
+chown root:qt5 /var/run/qt5/sockets
+
+echo "Qt5 IPC setup completed"
+echo "IPC socket directory: /var/run/qt5/sockets"
+echo "Shared memory: /var/run/qt5/shared_mem"
+echo "Group: qt5"
+
+# Validate setup
+if [ -d "/var/run/qt5" ] && [ -d "/var/run/qt5/sockets" ]; then
+    echo "✅ IPC setup successful"
+    return 0
+else
+    echo "❌ IPC setup failed"
+    return 1
+fi
