@@ -1,0 +1,10 @@
+config BR2_PACKAGE_QT_DEMO_SIMPLE
+    bool "qt-demo-simple"
+    help
+      Simple Qt5 demo application for STM32MP157F-DK2
+      
+      Basic Qt5 application demonstrating:
+      - Window creation and event handling
+      - Touch input integration
+      - Graphics rendering
+      - Cross-platform compatibility

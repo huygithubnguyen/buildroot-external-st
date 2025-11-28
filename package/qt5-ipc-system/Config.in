@@ -1,0 +1,22 @@
+config BR2_PACKAGE_QT5_IPC_SYSTEM
+    bool "Enable Qt5 IPC System"
+    default y
+    help
+      Enable the Qt5 IPC communication system with client library and server daemon.
+      This provides inter-process communication for Qt5 applications and system services.
+config BR2_PACKAGE_QT5_IPC_SYSTEM_DAEMON
+    bool "Enable IPC Daemon Service"
+    default y
+    help
+      Enable the IPC daemon service for message routing and client management.
+config BR2_PACKAGE_QT5_IPC_SYSTEM_CLIENTS
+    bool "Enable IPC Client Library"
+    default y
+    help
+      Enable the IPC client library for Qt5 applications to communicate with the IPC system.
+config BR2_PACKAGE_QT5_IPC_SYSTEM_TESTS
+    bool "Enable IPC System Tests"
+    default y
+    help
+      Enable IPC system tests and validation utilities.
+      
