@@ -1,0 +1,12 @@
+# Hash file for qt-demo-simple package
+# Generated from source files in layers/application-layer/recipes-qt/qt_demo_simple
+
+# Source files hash
+sha256  a300edb9948a526ac0d0052cf25a452ff9c27f73a93768d2e04d78e840f772ab  main_simple.cpp
+sha256  5a34d577f3db96f8acf8fbca7e25aec0401a0f434bfe6e1086edfca590d53357  Qt5DemoIPC.h
+sha256  7547b2aa45f6aaf0ef1089fb292c26b58072e2d09aca7e2132f6da7b3e351c4e  Qt5DemoIPC.cpp
+sha256  606ac9e79ebfbcfb824bba9d124d8ea45118bcb570c3e07292879ab795d795d3  qt_demo.pro
+sha256  cce993a26b65b71062590e1eebcacbaba9e708d241de2ae84800ff61786aa9ab  CMakeLists.txt
+
+# Overall package hash (computed from all source files)
+sha256  edeb17a408d5a26c0627424d471b612d158acfc3636e4d8cf3dbdeb659b0763d  qt-demo-simple-1.0.0.tar.gz
