@@ -1,8 +1,11 @@
 config BR2_PACKAGE_QT5_IPC_SYSTEM
     bool "Enable Qt5 IPC System"
+    depends on BR2_PACKAGE_QT5
+    depends on BR2_PACKAGE_QT5BASE
+    select BR2_PACKAGE_JSON_C
     default y
     help
-      Enable the Qt5 IPC communication system with client library and server daemon.
+      Enable Qt5 IPC communication system with client library and server daemon.
       This provides inter-process communication for Qt5 applications and system services.
 config BR2_PACKAGE_QT5_IPC_SYSTEM_DAEMON
     bool "Enable IPC Daemon Service"

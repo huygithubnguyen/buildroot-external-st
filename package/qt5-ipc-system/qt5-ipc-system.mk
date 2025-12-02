@@ -6,6 +6,7 @@ QT5_IPC_SYSTEM_SITE = $(TOPDIR)/../layers/application-layer/recipes-qt/qt5-ipc-s
 QT5_IPC_SYSTEM_SOURCE = qt5-ipc-system
 
 QT5_IPC_SYSTEM_DEPENDENCIES = qt5base json-c
+QT5_IPC_SYSTEM_INSTALL_STAGING = YES
 
 # IPC Daemon
 QT5_IPC_SYSTEM_CONF_OPTS += -DQT5_IPC_SYSTEM_DAEMON=y
