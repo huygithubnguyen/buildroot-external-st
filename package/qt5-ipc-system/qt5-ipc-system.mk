@@ -5,12 +5,19 @@ QT5_IPC_SYSTEM_SITE_METHOD = local
 QT5_IPC_SYSTEM_SITE = $(TOPDIR)/../layers/application-layer/recipes-qt/qt5-ipc-system
 QT5_IPC_SYSTEM_SOURCE = qt5-ipc-system
 
-QT5_IPC_SYSTEM_DEPENDENCIES = json-c
+QT5_IPC_SYSTEM_DEPENDENCIES = qt5base json-c
 
 # IPC Daemon
 QT5_IPC_SYSTEM_CONF_OPTS += -DQT5_IPC_SYSTEM_DAEMON=y
 
 # IPC Client Library
 QT5_IPC_SYSTEM_CONF_OPTS += -DQT5_IPC_SYSTEM_CLIENTS=y
+
+define QT5_IPC_SYSTEM_INSTALL_INIT_SYSV
+    $(INSTALL) -D -m 0755 $(@D)/services/S50ipc-daemon \
+        $(TARGET_DIR)/etc/init.d/S50ipc-daemon
+endef
+
+QT5_IPC_SYSTEM_POST_INSTALL_TARGET_HOOKS += QT5_IPC_SYSTEM_INSTALL_INIT_SYSV
 
 $(eval $(cmake-package))
