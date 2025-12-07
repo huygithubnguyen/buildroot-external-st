@@ -1,8 +1,6 @@
-source "$BR2_EXTERNAL_ST_PATH/package/m4projects/Config.in"
-source "$BR2_EXTERNAL_ST_PATH/package/m33projects/Config.in"
-source "$BR2_EXTERNAL_ST_PATH/package/eth-switch/Config.in"
-source "$BR2_EXTERNAL_ST_PATH/package/qt5-ipc-system/Config.in"
-source "$BR2_EXTERNAL_ST_PATH/package/qt-bike-computer/Config.in"
-source "$BR2_EXTERNAL_ST_PATH/package/qt-demo-simple/Config.in"
+menu "External STM32MP157F-DK2 Packages"
 
+source "package/qt5-ipc-system/Config.in"
+source "package/qt-bike-gui/Config.in"
 
+endmenu

@@ -1,0 +1,55 @@
+config BR2_PACKAGE_QT_BIKE_GUI
+	bool "qt-bike-gui"
+	depends on BR2_PACKAGE_QT5BASE
+	depends on BR2_PACKAGE_QT5DECLARATIVE
+	depends on BR2_PACKAGE_QT5MULTIMEDIA
+	depends on BR2_PACKAGE_QT5SVG
+	depends on BR2_PACKAGE_QT5_IPC_SYSTEM
+	select BR2_PACKAGE_QT5BASE
+	select BR2_PACKAGE_QT5DECLARATIVE
+	select BR2_PACKAGE_QT5MULTIMEDIA
+	select BR2_PACKAGE_QT5SVG
+	select BR2_PACKAGE_QT5_IPC_SYSTEM
+	help
+	  Qt5 Bike Computer GUI for STM32MP157F-DK2 embedded platform.
+	  Features include:
+	  - Real-time GPS display and navigation
+	  - Sensor data visualization (speed, cadence, heart rate)
+	  - ANT+ device integration
+	  - Multimedia support for alerts and sounds
+	  - SVG-based scalable graphics
+	  - IPC communication with backend services
+	  - EGLFS hardware acceleration
+	  - Touch screen interface
+
+	  This application provides a professional bike computer interface
+	  optimized for the STM32MP157F-DK2 hardware.
+
+if BR2_PACKAGE_QT_BIKE_GUI
+
+config BR2_PACKAGE_QT_BIKE_GUI_DEMO_MODE
+	bool "Enable demo mode"
+	help
+	  Enable demo mode with simulated data for testing and demonstration
+	  purposes. When enabled, the application will generate fake GPS,
+	  sensor, and ANT+ data instead of requiring real hardware.
+
+config BR2_PACKAGE_QT_BIKE_GUI_BUILD_TESTS
+	bool "Build unit tests"
+	help
+	  Build and install unit tests for qt-bike-gui. Tests will be
+	  installed in /usr/lib/qt-bike-gui/tests and can be run with
+	  the qt-bike-gui-test command.
+
+config BR2_PACKAGE_QT_BIKE_GUI_DEBUG
+	bool "Enable debug build"
+	help
+	  Enable debug symbols and logging for qt-bike-gui.
+	  Useful for development and troubleshooting.
+
+endif
+
+comment "qt-bike-gui needs Qt5 components and qt5-ipc-system"
+	depends on !BR2_PACKAGE_QT5BASE || !BR2_PACKAGE_QT5DECLARATIVE || \
+		!BR2_PACKAGE_QT5MULTIMEDIA || !BR2_PACKAGE_QT5SVG || \
+		!BR2_PACKAGE_QT5_IPC_SYSTEM

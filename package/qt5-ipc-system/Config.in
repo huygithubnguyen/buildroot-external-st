@@ -1,25 +1,32 @@
 config BR2_PACKAGE_QT5_IPC_SYSTEM
-    bool "Enable Qt5 IPC System"
-    depends on BR2_PACKAGE_QT5
-    depends on BR2_PACKAGE_QT5BASE
-    select BR2_PACKAGE_JSON_C
-    default y
-    help
-      Enable Qt5 IPC communication system with client library and server daemon.
-      This provides inter-process communication for Qt5 applications and system services.
-config BR2_PACKAGE_QT5_IPC_SYSTEM_DAEMON
-    bool "Enable IPC Daemon Service"
-    default y
-    help
-      Enable the IPC daemon service for message routing and client management.
-config BR2_PACKAGE_QT5_IPC_SYSTEM_CLIENTS
-    bool "Enable IPC Client Library"
-    default y
-    help
-      Enable the IPC client library for Qt5 applications to communicate with the IPC system.
-config BR2_PACKAGE_QT5_IPC_SYSTEM_TESTS
-    bool "Enable IPC System Tests"
-    default y
-    help
-      Enable IPC system tests and validation utilities.
-      
+	bool "qt5-ipc-system"
+	depends on BR2_PACKAGE_JSON_C
+	depends on BR2_PACKAGE_QT5BASE
+	depends on BR2_PACKAGE_QT5DECLARATIVE
+	select BR2_PACKAGE_JSON_C
+	select BR2_PACKAGE_QT5BASE
+	select BR2_PACKAGE_QT5DECLARATIVE
+	help
+	  Qt5 IPC System provides inter-process communication for embedded
+	  applications on STM32MP157F-DK2. Includes:
+	  - Core IPC library (C)
+	  - Qt5 wrapper library (C++)
+	  - IPC daemon for service management
+	  - JSON-based message protocol
+	  - Socket-based communication
+
+	  This package is required by qt-bike-gui and other Qt5 applications
+	  that need IPC communication on the STM32MP157F-DK2 platform.
+
+if BR2_PACKAGE_QT5_IPC_SYSTEM
+
+config BR2_PACKAGE_QT5_IPC_SYSTEM_DEBUG
+	bool "Enable debug build"
+	help
+	  Enable debug symbols and logging for qt5-ipc-system.
+	  Useful for development and troubleshooting.
+
+endif
+
+comment "qt5-ipc-system needs json-c and Qt5"
+	depends on !BR2_PACKAGE_JSON_C || !BR2_PACKAGE_QT5BASE || !BR2_PACKAGE_QT5DECLARATIVE
