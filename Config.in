@@ -1,6 +1,6 @@
 menu "External STM32MP157F-DK2 Packages"
 
-source "package/qt5-ipc-system/Config.in"
-source "package/qt-bike-gui/Config.in"
+source "$BR2_EXTERNAL_ST_PATH/package/qt5-ipc-system/Config.in"
+source "$BR2_EXTERNAL_ST_PATH/package/qt-bike-gui/Config.in"
 
 endmenu
