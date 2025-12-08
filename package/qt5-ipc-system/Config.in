@@ -1,10 +1,11 @@
 config BR2_PACKAGE_QT5_IPC_SYSTEM
 	bool "qt5-ipc-system"
-	depends on BR2_PACKAGE_JSON_C
-	depends on BR2_PACKAGE_QT5BASE
-	depends on BR2_PACKAGE_QT5DECLARATIVE
+	depends on BR2_USE_MMU
+	depends on BR2_INSTALL_LIBSTDCPP
+	depends on BR2_TOOLCHAIN_HAS_THREADS
 	select BR2_PACKAGE_JSON_C
 	select BR2_PACKAGE_QT5BASE
+	select BR2_PACKAGE_QT5BASE_WIDGETS
 	select BR2_PACKAGE_QT5DECLARATIVE
 	help
 	  Qt5 IPC System provides inter-process communication for embedded
@@ -28,5 +29,6 @@ config BR2_PACKAGE_QT5_IPC_SYSTEM_DEBUG
 
 endif
 
-comment "qt5-ipc-system needs json-c and Qt5"
-	depends on !BR2_PACKAGE_JSON_C || !BR2_PACKAGE_QT5BASE || !BR2_PACKAGE_QT5DECLARATIVE
+comment "qt5-ipc-system needs toolchain with MMU, C++ and threads"
+	depends on !BR2_USE_MMU || !BR2_INSTALL_LIBSTDCPP || \
+		!BR2_TOOLCHAIN_HAS_THREADS

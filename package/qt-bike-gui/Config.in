@@ -1,10 +1,8 @@
 config BR2_PACKAGE_QT_BIKE_GUI
 	bool "qt-bike-gui"
-	depends on BR2_PACKAGE_QT5BASE
-	depends on BR2_PACKAGE_QT5DECLARATIVE
-	depends on BR2_PACKAGE_QT5MULTIMEDIA
-	depends on BR2_PACKAGE_QT5SVG
-	depends on BR2_PACKAGE_QT5_IPC_SYSTEM
+	depends on BR2_USE_MMU
+	depends on BR2_INSTALL_LIBSTDCPP
+	depends on BR2_TOOLCHAIN_HAS_THREADS
 	select BR2_PACKAGE_QT5BASE
 	select BR2_PACKAGE_QT5DECLARATIVE
 	select BR2_PACKAGE_QT5MULTIMEDIA
@@ -49,7 +47,6 @@ config BR2_PACKAGE_QT_BIKE_GUI_DEBUG
 
 endif
 
-comment "qt-bike-gui needs Qt5 components and qt5-ipc-system"
-	depends on !BR2_PACKAGE_QT5BASE || !BR2_PACKAGE_QT5DECLARATIVE || \
-		!BR2_PACKAGE_QT5MULTIMEDIA || !BR2_PACKAGE_QT5SVG || \
-		!BR2_PACKAGE_QT5_IPC_SYSTEM
+comment "qt-bike-gui needs toolchain with MMU, C++ and threads"
+	depends on !BR2_USE_MMU || !BR2_INSTALL_LIBSTDCPP || \
+		!BR2_TOOLCHAIN_HAS_THREADS
