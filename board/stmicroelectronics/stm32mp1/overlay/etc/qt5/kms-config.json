@@ -4,8 +4,8 @@
     "pbuffers": true,
     "outputs": [
         {
-            "name": "HDMI-A-1",
-            "mode": "480x272"
+            "name": "DSI1",
+            "mode": "480x800"
         }
     ]
 }
