@@ -52,7 +52,6 @@ endif
 # STM32MP157F-DK2 specific optimizations
 QT_BIKE_GUI_CONF_OPTS += \
 	-DCMAKE_CXX_FLAGS="-march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard -O2 -pipe -g -Wall -Wextra" \
-	-DQT_NO_DEBUG_OUTPUT=ON
 
 # Install init script
 define QT_BIKE_GUI_INSTALL_INIT_SYSV
@@ -77,14 +76,7 @@ endef
 
 QT_BIKE_GUI_POST_INSTALL_TARGET_HOOKS += QT_BIKE_GUI_CREATE_RUNTIME_DIRS
 
-# Install configuration files
-define QT_BIKE_GUI_INSTALL_CONFIG
-	$(INSTALL) -d -m 0755 $(TARGET_DIR)/opt/qt-bike-gui/config
-	$(INSTALL) -m 0644 $(@D)/config/* \
-		$(TARGET_DIR)/opt/qt-bike-gui/config/ 2>/dev/null || true
-endef
 
-QT_BIKE_GUI_POST_INSTALL_TARGET_HOOKS += QT_BIKE_GUI_INSTALL_CONFIG
 
 # Install documentation
 define QT_BIKE_GUI_INSTALL_DOCS
