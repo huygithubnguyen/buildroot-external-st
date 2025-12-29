@@ -1,0 +1,182 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          qt5-services
+# Required-Start:    $local_fs $syslog qt5-env display touch
+# Required-Stop:     $local_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Qt5 Bike Computer stack
+# Description:       Start IPC Daemon and Bike GUI
+### END INIT INFO
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+
+# Configuration
+BINARY_GUI="/usr/bin/qt_bike_gui"
+BINARY_DAEMON="/usr/sbin/ipc-daemon"
+BINARY_MOCK="/usr/bin/ipc_mock_sensor"
+
+# Start Qt5 application services
+start_qt5_services() {
+    echo "Starting Qt5 services..."
+    
+    # 1. Setup Runtime Directories
+    mkdir -p /var/run/qt5/sockets
+    chmod 777 /var/run/qt5
+    chmod 777 /var/run/qt5/sockets
+    export XDG_RUNTIME_DIR=/var/run/qt5
+
+    # 2. Start IPC Daemon (Must be First)
+    if [ -x "$BINARY_DAEMON" ]; then
+        echo "Starting IPC Daemon..."
+        start-stop-daemon -S -b -q -m -p /var/run/ipc-daemon.pid -x "$BINARY_DAEMON"
+        # Wait for socket creation
+        sleep 1
+    else
+        echo "ERROR: IPC Daemon not found at $BINARY_DAEMON"
+    fi
+
+    # 3. Start Bike GUI
+    if [ -x "$BINARY_GUI" ]; then
+        echo "Starting Bike GUI..."
+        # We use a wrapper or direct call. Backgrounding with start-stop-daemon 
+        # is safer for init scripts.
+        start-stop-daemon -S -q -m -p /var/run/qt-bike-gui.pid -x "$BINARY_GUI"
+    else
+        echo "ERROR: Bike GUI not found at $BINARY_GUI"
+    fi
+    
+    # 4. Start Mock Sensor (Optional - Uncoment for Auto-Demo)
+    if [ -x "$BINARY_MOCK" ]; then
+       echo "Starting Mock Sensor..."
+       start-stop-daemon -S -b -q -m -p /var/run/ipc-mock.pid -x "$BINARY_MOCK"
+    fi
+    
+    echo "Qt5 services started"
+}
+
+# Configure Qt5 service environment
+configure_qt5_services() {
+    echo "Configuring Qt5 services environment..."
+    
+    # Critical Environment Variables
+    export QT_QPA_PLATFORM=eglfs
+    export QT_QPA_EGLFS_INTEGRATION=eglfs_kms
+    export QT_QPA_EGLFS_KMS_CONFIG=/etc/qt5/kms-config.json
+    export QT_LOGGING_RULES=""
+    
+    # Display Dimensions (Crucial for proper Font DPI!)
+    export QT_QPA_EGLFS_PHYSICAL_WIDTH=480
+    export QT_QPA_EGLFS_PHYSICAL_HEIGHT=272
+    export QT_QPA_EGLFS_WIDTH=480
+    export QT_QPA_EGLFS_HEIGHT=272
+    export QT_QPA_EGLFS_ALWAYS_SET_MODE=1
+    export QT_QPA_EGLFS_ROTATION=0
+    
+    # Paths
+    export QT_PLUGIN_PATH=/usr/lib/qt5/plugins
+    export QTDIR=/usr
+    
+    # Detect Touch Device Logic
+    if [ -e "/dev/input/event0" ]; then
+        # Default fallback
+        export QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS="/dev/input/event0"
+    fi
+    
+    # Smart detection (overrides default if better match found)
+    for device in /dev/input/event*; do
+        if [ -e "$device" ]; then
+            if udevadm info --query=property --name="$device" 2>/dev/null | grep -q "ID_INPUT_TOUCHSCREEN=1"; then
+                export QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS="$device"
+                echo "Smart Touch Detection: Found $device"
+                break
+            fi
+        fi
+    done
+
+    # Ensure fonts are found if needed
+    export QT_QPA_FONTDIR=/usr/share/fonts
+    
+    echo "Qt5 services environment configured"
+}
+
+# Main function
+start() {
+    echo "Starting Qt5 Bike Services..."
+    configure_qt5_services
+    start_qt5_services
+    echo "Startup completed"
+}
+
+# Stop function
+stop() {
+    echo "Stopping Qt5 services..."
+    
+    # Stop in reverse order
+    start-stop-daemon -K -q -p /var/run/ipc-mock.pid 2>/dev/null
+    start-stop-daemon -K -q -p /var/run/qt-bike-gui.pid 2>/dev/null
+    start-stop-daemon -K -q -p /var/run/ipc-daemon.pid 2>/dev/null
+    
+    # Fallback kill if pids missing
+    killall qt_bike_gui 2>/dev/null
+    killall ipc-daemon 2>/dev/null
+    killall ipc_mock_sensor 2>/dev/null
+    
+    # Cleanup Sockets
+    rm -f /var/run/qt5/sockets/ipc.sock
+    
+    echo "Qt5 services stopped"
+}
+
+# Restart function
+restart() {
+    stop
+    sleep 2
+    start
+}
+
+# Status function
+status() {
+    echo "=== STM32MP157F-DK2 Qt5 Services Status ==="
+    
+    if pgrep -x "ipc-daemon" > /dev/null; then
+        echo "  ✅ ipc-daemon     [RUNNING]"
+    else
+        echo "  ❌ ipc-daemon     [STOPPED]"
+    fi
+    
+    if pgrep -x "qt_bike_gui" > /dev/null; then
+        echo "  ✅ qt_bike_gui    [RUNNING]"
+    else
+        echo "  ❌ qt_bike_gui    [STOPPED]"
+    fi
+
+    if [ -S "/var/run/qt5/sockets/ipc.sock" ]; then
+        echo "  ✅ IPC Socket     [EXISTS]"
+    else
+        echo "  ❌ IPC Socket     [MISSING]"
+    fi
+    echo "=== Status Complete ==="
+}
+
+# Handle command line arguments
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart|reload)
+        restart
+        ;;
+    status)
+        status
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
+        exit 1
+        ;;
+esac
+
+exit 0
